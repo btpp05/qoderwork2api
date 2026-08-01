@@ -41,6 +41,9 @@ type Cred struct {
 	MachineToken string
 	MachineType  string
 
+	// FilePath 来源文件路径；refresh 后原子写回此处
+	FilePath string
+
 	mu sync.Mutex
 }
 
@@ -135,6 +138,7 @@ func LoadFile(path string) (*Cred, error) {
 	if c.UID == "" {
 		return nil, fmt.Errorf("missing uid in %s", path)
 	}
+	c.FilePath = path
 	return &c, nil
 }
 
@@ -244,6 +248,44 @@ func (c *Cred) refreshLocked(base string) error {
 		c.DTExpiresAt = now.Add(30 * 24 * time.Hour).Unix() // dt 观测寿命 30d
 	}
 	return nil
+}
+
+// SaveAtomic 以嵌套形原子写回 FilePath（tmp + rename），保持与 OAuth 落盘格式一致。
+// 与 workbuddy2api 的 auth.SaveAtomic 对齐。
+// 加锁外壳：防止与 EnsureDT 并发读写 token 字段导致写回半更新。
+func (c *Cred) SaveAtomic() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.saveAtomicLocked()
+}
+
+// saveAtomicLocked 是 SaveAtomic 的持锁内部版本；调用方必须已持有 c.mu。
+// 供 EnsureDT 等持锁路径在 refresh 后直接写回，避免重复加锁。
+func (c *Cred) saveAtomicLocked() error {
+	if c.FilePath == "" {
+		return fmt.Errorf("no FilePath set")
+	}
+	doc := map[string]any{
+		"auth": map[string]any{
+			"accessToken":  c.DT,
+			"refreshToken": c.DRT,
+			"expiresAt":    c.DTExpiresAt,
+			"domain":       "qoder.com.cn",
+		},
+		"account": map[string]any{
+			"uid":      c.UID,
+			"nickname": c.Nickname,
+		},
+	}
+	raw, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := c.FilePath + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, c.FilePath)
 }
 
 // uuid4 / hexShort 工具。
