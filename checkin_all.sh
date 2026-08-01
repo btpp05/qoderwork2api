@@ -2,7 +2,7 @@
 # checkin_all.sh 批量签到测试所有 qoderwork auth 文件
 set -e
 
-AUTHS_DIR="/root/cpa-manager-plus/cliproxyapi/auths"
+AUTHS_DIR="/root/qoderwork2api/auths"
 cd /root/qoderwork2api
 
 # 构建测试二进制
@@ -27,16 +27,16 @@ func main() {
 		os.Exit(1)
 	}
 	up := upstream.New()
-	if err := c.EnsureJT(up.Base); err != nil {
-		fmt.Printf("JT_ERR %v\n", err)
+	if err := c.EnsureDT(up.Base); err != nil {
+		fmt.Printf("DT_ERR %v\n", err)
 		os.Exit(1)
 	}
-	ok, err := up.DailyCheckin(c.JT)
+	ok, err := up.DailyCheckin(c.DT)
 	if err != nil {
 		fmt.Printf("CHECKIN_FAIL %v\n", err)
 		os.Exit(1)
 	}
-	remain, exceeded, err := up.QuotaUsage(c.JT)
+	remain, exceeded, err := up.QuotaUsage(c.DT)
 	if err != nil {
 		fmt.Printf("QUOTA_ERR %v\n", err)
 		os.Exit(1)
