@@ -176,6 +176,35 @@ func TestStatusEndpoint(t *testing.T) {
 	}
 }
 
+func TestStatusRequiresAuth(t *testing.T) {
+	p := pool.New("")
+	p.Add(&cred.Cred{UID: "u1", DT: "dt-1", Nickname: "nick"})
+	h := NewHandler(Config{Pool: p, Upstream: upstream.New(), APIKey: "secret"})
+
+	// 无 token → 401
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/status", nil))
+	if rec.Code != 401 {
+		t.Errorf("no token: code=%d", rec.Code)
+	}
+
+	// 带 token → 200
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/status", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Errorf("with token: code=%d", rec.Code)
+	}
+
+	// /healthz 无鉴权仍 200
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/healthz", nil))
+	if rec.Code != 200 {
+		t.Errorf("healthz: code=%d", rec.Code)
+	}
+}
+
 const fakeSSEOK = "data:{\"body\":\"{\\\"id\\\":\\\"chatcmpl-1\\\",\\\"created\\\":1753600000,\\\"choices\\\":[{\\\"delta\\\":{\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"你好\\\"}}]}\"}\n\n" +
 	"data:{\"body\":\"{\\\"id\\\":\\\"chatcmpl-1\\\",\\\"created\\\":1753600000,\\\"choices\\\":[{\\\"delta\\\":{},\\\"finish_reason\\\":\\\"stop\\\"}],\\\"usage\\\":{\\\"prompt_tokens\\\":1,\\\"completion_tokens\\\":1,\\\"total_tokens\\\":2}}\"}\n\n" +
 	"data:{\"body\":\"[DONE]\"}\n\nevent:finish\ndata:{\"firstTokenDuration\":100}\n\n"
