@@ -36,10 +36,14 @@ type Handler struct {
 	modelsMu       sync.RWMutex
 	dynamicModels  []upstream.DynamicModel // 上游原始模型（含 display_name/元数据）
 	dynamicMap     map[string]string       // 客户端名 → 上游 key（解析后）
-	dynamicFetched time.Time
+	dynamicFetched time.Time              // 最近一次成功拉取时间
+	lastFetchFail  time.Time              // 最近一次拉取失败时间（负缓存）
 }
 
-const dynamicModelsTTL = time.Hour
+const (
+	dynamicModelsTTL        = time.Hour
+	modelsFetchFailCooldown = 5 * time.Minute
+)
 
 // NewHandler 构建。
 func NewHandler(cfg Config) *Handler {
@@ -165,12 +169,18 @@ func (h *Handler) dynamicModelsMeta() map[string]upstream.DynamicModel {
 
 // effectiveModelMap 返回当前生效的 客户端名(display_name 规范化) → 上游 key 映射：
 // 动态拉取上游模型列表（缓存 1h），失败回退内置静态表（KNOWLEDGE §6.2 实测）。
+// 拉取失败记录时间戳进入 5min 负缓存，冷却期内直接用 fallback，避免反复打上游。
 func (h *Handler) effectiveModelMap() map[string]string {
 	h.modelsMu.RLock()
 	if len(h.dynamicMap) > 0 && time.Since(h.dynamicFetched) < dynamicModelsTTL {
 		m := h.dynamicMap
 		h.modelsMu.RUnlock()
 		return m
+	}
+	// 失败负缓存：冷却期内不再请求上游。
+	if !h.lastFetchFail.IsZero() && time.Since(h.lastFetchFail) < modelsFetchFailCooldown {
+		h.modelsMu.RUnlock()
+		return fallbackModelMap()
 	}
 	h.modelsMu.RUnlock()
 
@@ -183,10 +193,12 @@ func (h *Handler) effectiveModelMap() map[string]string {
 		if cred.IsAuthInvalid(err) {
 			h.cfg.Pool.Disable(acct.UID, "auth invalid (re-login required)")
 		}
+		h.recordFetchFail()
 		return fallbackModelMap()
 	}
 	dyn, err := h.cfg.Upstream.FetchModels(acct)
 	if err != nil || len(dyn) == 0 {
+		h.recordFetchFail()
 		return fallbackModelMap()
 	}
 	resolved := upstream.ResolveModelMap(dyn)
@@ -194,8 +206,16 @@ func (h *Handler) effectiveModelMap() map[string]string {
 	h.dynamicModels = dyn
 	h.dynamicMap = resolved
 	h.dynamicFetched = time.Now()
+	h.lastFetchFail = time.Time{} // 成功则清空负缓存
 	h.modelsMu.Unlock()
 	return resolved
+}
+
+// recordFetchFail 记录 models 拉取失败时间戳，进入负缓存冷却期。
+func (h *Handler) recordFetchFail() {
+	h.modelsMu.Lock()
+	h.lastFetchFail = time.Now()
+	h.modelsMu.Unlock()
 }
 
 // fallbackModelMap 内置静态模型表（上游模型接口 403 时的兜底）。

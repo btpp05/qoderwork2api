@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,6 +61,56 @@ const fakeModelsJSON = `{"chat":[
   {"key":"qmodel_preview","display_name":"Qwen3.8-Max-Preview","enable":true,"is_reasoning":true,"is_vl":true,"max_input_tokens":180000,"price_factor":0.05,"context_config":{"200K":{"token_count":200000,"is_default":true},"400K":{"token_count":400000},"1M":{"token_count":1000000}}},
   {"key":"dmodel","display_name":"DeepSeek-V4-Pro","enable":true,"is_reasoning":true,"is_vl":true,"max_input_tokens":180000,"price_factor":0.5}
 ]}`
+
+func TestModelsNegativeCacheOnFetchFailure(t *testing.T) {
+	var calls int
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/model/list") {
+			mu.Lock()
+			calls++
+			mu.Unlock()
+			w.WriteHeader(500)
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	p := pool.New("")
+	p.Add(&cred.Cred{UID: "u1", DT: "dt-fake", DTExpiresAt: time.Now().Add(10 * time.Hour).Unix(), MachineID: "m", MachineToken: "t", MachineType: "y"})
+	h := newTestHandler(p, upstream.NewWithBase(srv.URL, srv.URL))
+
+	// 连续 3 次请求，上游持续 500 → 只应触发 1 次 fetch（负缓存生效），
+	// 其余走静态 fallback（仍返回 200）。
+	for i := 0; i < 3; i++ {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/v1/models", nil))
+		if rec.Code != 200 {
+			t.Fatalf("req %d: code=%d body=%s", i, rec.Code, rec.Body)
+		}
+	}
+	mu.Lock()
+	if calls != 1 {
+		t.Errorf("want 1 fetch, got %d", calls)
+	}
+	mu.Unlock()
+
+	// 冷却期结束（把失败时间戳拨回 10 分钟前）→ 应重新 fetch。
+	h.modelsMu.Lock()
+	h.lastFetchFail = time.Now().Add(-10 * time.Minute)
+	h.modelsMu.Unlock()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/v1/models", nil))
+	if rec.Code != 200 {
+		t.Fatalf("after cooldown: code=%d", rec.Code)
+	}
+	mu.Lock()
+	if calls != 2 {
+		t.Errorf("want 2 fetch after cooldown, got %d", calls)
+	}
+	mu.Unlock()
+}
 
 func TestModelsDynamicFromUpstream(t *testing.T) {
 	srv := fakeModelsGateway(t, fakeModelsJSON, nil)
