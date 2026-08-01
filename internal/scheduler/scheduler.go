@@ -131,6 +131,10 @@ func (s *Scheduler) RunKeepaliveNow() {
 			}
 			continue
 		}
+		// refresh 成功，写回 auth 文件（dt/drt/expiresAt 已更新）
+		if err := a.SaveAtomic(); err != nil {
+			log.Printf("keepalive %s save: %v", st.UID, err)
+		}
 		a.EnsureMachineFingerprint()
 	}
 	s.cfg.Pool.SaveState()
