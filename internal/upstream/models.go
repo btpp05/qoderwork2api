@@ -17,6 +17,12 @@ import (
 // ModelsPath 模型列表端点。
 const ModelsPath = "/algo/api/v2/model/list?Encode=1"
 
+// ContextOption 上下文窗口可选档位。
+type ContextOption struct {
+	TokenCount int64 `json:"token_count"`
+	IsDefault bool   `json:"is_default"`
+}
+
 // DynamicModel 上游 chat scene 单个模型。
 type DynamicModel struct {
 	Key            string  `json:"key"`
@@ -26,6 +32,36 @@ type DynamicModel struct {
 	IsVL           bool    `json:"is_vl"`
 	MaxInputTokens int64   `json:"max_input_tokens"`
 	PriceFactor    float64 `json:"price_factor"`
+	ContextConfig  map[string]ContextOption `json:"context_config,omitempty"`
+}
+
+// MaxContextTokens 返回模型支持的最大上下文 token 数。
+// 优先取 context_config 中最大的 token_count，没有则回退 max_input_tokens。
+func (m DynamicModel) MaxContextTokens() int64 {
+	var max int64
+	for _, opt := range m.ContextConfig {
+		if opt.TokenCount > max {
+			max = opt.TokenCount
+		}
+	}
+	if max > 0 {
+		return max
+	}
+	return m.MaxInputTokens
+}
+
+// DefaultContextTokens 返回默认上下文窗口大小。
+// 优先取 context_config 中 is_default=true 的 token_count，没有则回退 max_input_tokens。
+func (m DynamicModel) DefaultContextTokens() int64 {
+	for _, opt := range m.ContextConfig {
+		if opt.IsDefault && opt.TokenCount > 0 {
+			return opt.TokenCount
+		}
+	}
+	if m.MaxInputTokens > 0 {
+		return m.MaxInputTokens
+	}
+	return 180000 // 兜底
 }
 
 // FetchModels 调上游动态模型接口。

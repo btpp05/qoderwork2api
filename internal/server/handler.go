@@ -127,8 +127,15 @@ func (h *Handler) models(w http.ResponseWriter, r *http.Request) {
 			if m.IsVL {
 				entry["vision"] = true
 			}
-			if m.MaxInputTokens > 0 {
-				entry["context_length"] = m.MaxInputTokens
+			// 真实上下文上限：优先 context_config 中的最大 token_count，
+			// 没有则回退 max_input_tokens（默认 180000）。
+			maxCtx := m.MaxContextTokens()
+			if maxCtx > 0 {
+				entry["context_length"] = maxCtx
+			}
+			defCtx := m.DefaultContextTokens()
+			if defCtx > 0 {
+				entry["context_window"] = defCtx
 			}
 			if m.PriceFactor > 0 {
 				entry["price_factor"] = m.PriceFactor
