@@ -6,7 +6,7 @@ import (
 
 func TestNormalizeModelName(t *testing.T) {
 	cases := map[string]string{
-		"Qwen3.8-Max-Preview": "qwen3.8-max-preview",
+		"Qwen3.8-Max":         "qwen3.8-max",
 		"DeepSeek-V4-Pro":     "deepseek-v4-pro",
 		"GLM-5.2":             "glm-5.2",
 		"Kimi-K2.7-Code":      "kimi-k2.7-code",
@@ -24,15 +24,15 @@ func TestNormalizeModelName(t *testing.T) {
 
 func TestResolveModelMapDisplayName(t *testing.T) {
 	dynamic := []DynamicModel{
-		{Key: "qmodel_preview", DisplayName: "Qwen3.8-Max-Preview", Enable: true},
+		{Key: "qmodel_38max", DisplayName: "Qwen3.8-Max", Enable: true},
 		{Key: "dmodel", DisplayName: "DeepSeek-V4-Pro", Enable: true},
 		{Key: "dfmodel", DisplayName: "DeepSeek-V4-Flash", Enable: true},
 		{Key: "auto", DisplayName: "Auto", Enable: true},
 		{Key: "newkey", DisplayName: "", Enable: true}, // 无 display_name → 用 key
 	}
 	m := ResolveModelMap(dynamic)
-	if m["qwen3.8-max-preview"] != "qmodel_preview" {
-		t.Errorf("qwen3.8-max-preview → %v", m["qwen3.8-max-preview"])
+	if m["qwen3.8-max"] != "qmodel_38max" {
+		t.Errorf("qwen3.8-max → %v", m["qwen3.8-max"])
 	}
 	if m["deepseek-v4-pro"] != "dmodel" {
 		t.Errorf("deepseek-v4-pro → %v", m["deepseek-v4-pro"])

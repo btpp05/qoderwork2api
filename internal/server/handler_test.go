@@ -58,7 +58,7 @@ func fakeModelsGateway(t *testing.T, modelsJSON string, chatFn func(w http.Respo
 
 const fakeModelsJSON = `{"chat":[
   {"key":"dfmodel","display_name":"DeepSeek-V4-Flash","enable":true,"is_reasoning":false,"is_vl":true,"max_input_tokens":180000,"price_factor":0.1,"context_config":{"200K":{"token_count":200000,"is_default":true},"400K":{"token_count":400000},"1M":{"token_count":1000000}}},
-  {"key":"qmodel_preview","display_name":"Qwen3.8-Max-Preview","enable":true,"is_reasoning":true,"is_vl":true,"max_input_tokens":180000,"price_factor":0.05,"context_config":{"200K":{"token_count":200000,"is_default":true},"400K":{"token_count":400000},"1M":{"token_count":1000000}}},
+  {"key":"qmodel_38max","display_name":"Qwen3.8-Max","enable":true,"is_reasoning":true,"is_vl":true,"max_input_tokens":180000,"price_factor":0.05,"context_config":{"200K":{"token_count":200000,"is_default":true},"400K":{"token_count":400000},"1M":{"token_count":1000000}}},
   {"key":"dmodel","display_name":"DeepSeek-V4-Pro","enable":true,"is_reasoning":true,"is_vl":true,"max_input_tokens":180000,"price_factor":0.5}
 ]}`
 
@@ -141,14 +141,14 @@ func TestModelsDynamicFromUpstream(t *testing.T) {
 	if _, ok := ids["deepseek-v4-flash"]; !ok {
 		t.Errorf("deepseek-v4-flash missing: %v", ids)
 	}
-	if _, ok := ids["qwen3.8-max-preview"]; !ok {
-		t.Errorf("qwen3.8-max-preview missing: %v", ids)
+	if _, ok := ids["qwen3.8-max"]; !ok {
+		t.Errorf("qwen3.8-max missing: %v", ids)
 	}
 	// 元数据透传
 	if m := ids["deepseek-v4-flash"]; m["upstream_key"] != "dfmodel" || m["vision"] != true {
 		t.Errorf("meta wrong: %+v", m)
 	}
-	if m := ids["qwen3.8-max-preview"]; m["reasoning"] != true || m["context_length"].(float64) != 1000000 || m["context_window"].(float64) != 200000 {
+	if m := ids["qwen3.8-max"]; m["reasoning"] != true || m["context_length"].(float64) != 1000000 || m["context_window"].(float64) != 200000 {
 		t.Errorf("meta wrong: %+v", m)
 	}
 }

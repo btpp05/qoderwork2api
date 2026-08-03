@@ -171,14 +171,14 @@ func TestAggregateNested(t *testing.T) {
 		"data:{\"body\":\"{\\\"id\\\":\\\"chatcmpl-1\\\",\\\"choices\\\":[{\\\"delta\\\":{\\\"content\\\":\\\"好\\\"}}]}\"}\n\n" +
 		"data:{\"body\":\"{\\\"id\\\":\\\"chatcmpl-1\\\",\\\"choices\\\":[{\\\"delta\\\":{},\\\"finish_reason\\\":\\\"stop\\\"}],\\\"usage\\\":{\\\"prompt_tokens\\\":1,\\\"completion_tokens\\\":2,\\\"total_tokens\\\":3}}\"}\n\n" +
 		"data:{\"body\":\"[DONE]\"}\n\n"
-	resp, err := AggregateNested(strings.NewReader(raw), "qwen3.8-max-preview")
+	resp, err := AggregateNested(strings.NewReader(raw), "qwen3.8-max")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp["object"] != "chat.completion" {
 		t.Errorf("object=%v", resp["object"])
 	}
-	if resp["model"] != "qwen3.8-max-preview" {
+	if resp["model"] != "qwen3.8-max" {
 		t.Errorf("model=%v (should be client name, not upstream 'auto')", resp["model"])
 	}
 	msg := resp["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)

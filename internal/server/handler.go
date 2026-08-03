@@ -223,7 +223,7 @@ func (h *Handler) recordFetchFail() {
 func fallbackModelMap() map[string]string {
 	return map[string]string{
 		"auto":                "auto",
-		"qwen3.8-max-preview": "qmodel_preview",
+		"qwen3.8-max":         "qmodel_38max",
 		"qwen3.7-max":         "qmodel_latest",
 		"qwen3.7-plus":        "qmodel",
 		"qwen3.6-flash":       "q36fmodel",
