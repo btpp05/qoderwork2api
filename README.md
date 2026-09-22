@@ -96,9 +96,11 @@ curl -s http://localhost:7864/v1/chat/completions \
 | `./credit.sh` | 积分日报（美化输出） |
 | `./credit.sh -json` | 积分原始 JSON |
 
-## 架构文档
+## 部署指南
 
-详细架构规格见 [SPEC.md](SPEC.md)，稳定性优化记录见 [LOOP.md](LOOP.md)。
+详细部署文档（包含 Cloudflare Tunnel 暴露、常见问题排查）：[DEPLOYMENT.md](DEPLOYMENT.md)
+
+---
 
 ## 免责声明
 
